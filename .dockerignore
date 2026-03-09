@@ -1,0 +1,53 @@
+# Version control
+.git
+.gitignore
+
+# Python bytecode
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Test artifacts
+tests/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+
+# CI/CD
+.github/
+
+# Keep compiled migration files but exclude version scripts from the image
+# (migrations should be baked in at build time; listed here for clarity)
+# alembic/versions/*.py
+
+# Development tooling
+.mypy_cache/
+.ruff_cache/
+.flake8
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# IDE / editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store

@@ -1,0 +1,44 @@
+# ============================================================
+# Stage 1: builder — install Python dependencies
+# ============================================================
+FROM python:3.11-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /install
+
+COPY requirements.txt .
+
+RUN pip install --upgrade pip \
+    && pip install --prefix=/install --no-cache-dir -r requirements.txt
+
+
+# ============================================================
+# Stage 2: runtime — Celery worker image
+# ============================================================
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+# Copy installed packages from builder stage
+COPY --from=builder /install /usr/local
+
+# Create non-root user
+RUN addgroup --system appgroup \
+    && adduser --system --ingroup appgroup --no-create-home appuser
+
+WORKDIR /app
+
+# Copy application source code
+COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
+
+# Ensure the non-root user owns the app directory
+RUN chown -R appuser:appgroup /app
+
+USER appuser
+
+CMD ["celery", "-A", "app.workers.celery_app", "worker", "--loglevel=info", "--concurrency=4"]

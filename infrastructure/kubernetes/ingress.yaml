@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backend-ingress
+  namespace: research-platform
+  labels:
+    app: backend
+    app.kubernetes.io/name: research-platform
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  tls:
+    - hosts:
+        - api.researchplatform.com
+      # IMPORTANT: Replace 'tls-secret' with the name of the actual
+      # TLS secret created in this namespace (e.g. via cert-manager or
+      # by manually creating it with kubectl create secret tls).
+      secretName: tls-secret
+  rules:
+    - host: api.researchplatform.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 80

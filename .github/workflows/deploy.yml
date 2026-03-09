@@ -1,0 +1,168 @@
+name: Deploy — Version 1
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deploy target'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── 1. Backend health check ─────────────────────────────────────────────────
+  backend-check:
+    name: Backend — Smoke Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: research
+          POSTGRES_PASSWORD: research
+          POSTGRES_DB: research_marketplace_test
+        ports: [5432:5432]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports: [6379:6379]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://research:research@localhost:5432/research_marketplace_test
+      REDIS_URL: redis://localhost:6379/0
+      JWT_SECRET: ci-deploy-check-secret
+      ENVIRONMENT: development
+      STRIPE_SECRET_KEY: sk_test_placeholder
+      PAYPAL_CLIENT_ID: placeholder
+      PAYPAL_CLIENT_SECRET: placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - run: pip install -r requirements.txt
+
+      - name: Start API and verify /health
+        run: |
+          uvicorn app.main:app --host 0.0.0.0 --port 8000 &
+          sleep 8
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8000/health)
+          echo "Health check status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "❌ Health check failed ($STATUS)"
+            curl -s http://localhost:8000/health
+            exit 1
+          fi
+          echo "✅ Backend healthy"
+
+      - name: Verify all new API routes registered
+        run: |
+          ROUTES=$(curl -s http://localhost:8000/openapi.json | python3 -c "
+          import json,sys
+          spec = json.load(sys.stdin)
+          paths = list(spec['paths'].keys())
+          required = [
+            '/api/v1/account',
+            '/api/v1/payments/wallet/stripe-intent',
+            '/api/v1/payments/methods',
+            '/api/v1/payments/payout',
+            '/api/v1/payments/payouts',
+            '/api/v1/webhooks/stripe',
+            '/api/v1/webhooks/paypal',
+          ]
+          missing = [r for r in required if r not in paths]
+          if missing:
+            print('MISSING:', missing)
+            sys.exit(1)
+          print('✅ All required routes present:', len(paths), 'total routes')
+          ")
+          echo "$ROUTES"
+
+  # ── 2. Frontend build ───────────────────────────────────────────────────────
+  frontend-build:
+    name: Frontend — Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Build production bundle
+        run: npm run build
+        env:
+          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1' }}
+          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build-${{ github.sha }}
+          path: frontend/.next/
+          retention-days: 30
+
+  # ── 3. Deploy summary ───────────────────────────────────────────────────────
+  deploy-summary:
+    name: Deploy Summary
+    needs: [backend-check, frontend-build]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "## 🚀 Version 1 — Deploy Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Backend Smoke Test | ${{ needs.backend-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Build | ${{ needs.frontend-build.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Triggered by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Endpoints Verified" >> $GITHUB_STEP_SUMMARY
+          echo "- \`GET  /health\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`GET  /api/v1/account\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`POST /api/v1/payments/wallet/stripe-intent\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`GET  /api/v1/payments/methods\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`POST /api/v1/payments/payout\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`POST /api/v1/webhooks/stripe\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`POST /api/v1/webhooks/paypal\`" >> $GITHUB_STEP_SUMMARY
