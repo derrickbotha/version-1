@@ -1,0 +1,121 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-charcoal: #212529;
+  --color-white: #ffffff;
+  --color-steel-blue: #457b9d;
+  --color-cta-blue: #007bff;
+  --color-light-grey: #f5f7fa;
+  --color-med-grey: #6c757d;
+  --color-divider: #e6e9ed;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-inter), Inter, Helvetica, sans-serif;
+  color: #212529;
+  background-color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f7fa;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #457b9d;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #1d3557;
+}
+
+/* Selection color */
+::selection {
+  background-color: #007bff;
+  color: #ffffff;
+}
+
+::-moz-selection {
+  background-color: #007bff;
+  color: #ffffff;
+}
+
+/* Typography utilities */
+@layer components {
+  .font-display {
+    font-family: var(--font-playfair), 'Playfair Display', Georgia, serif;
+  }
+
+  .container-custom {
+    max-width: 1280px;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+
+  .section-padding {
+    padding-top: 5rem;
+    padding-bottom: 5rem;
+  }
+
+  .btn-primary {
+    @apply bg-ctaBlue text-white px-8 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-steelBlue hover:shadow-lg active:scale-95;
+  }
+
+  .btn-outline {
+    @apply border-2 border-charcoal text-charcoal px-8 py-3 rounded-lg font-medium transition-all duration-200 hover:bg-charcoal hover:text-white active:scale-95;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:-translate-y-1 hover:shadow-xl;
+  }
+}
+
+/* Carousel animation */
+@keyframes scrollCarousel {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.carousel-track {
+  animation: scrollCarousel 30s linear infinite;
+  display: flex;
+  width: max-content;
+}
+
+.carousel-track:hover {
+  animation-play-state: paused;
+}
+
+/* Input focus styles */
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #457b9d;
+  box-shadow: 0 0 0 3px rgba(69, 123, 157, 0.15);
+}
+
+/* Divider */
+.divider {
+  border-color: #e6e9ed;
+}
