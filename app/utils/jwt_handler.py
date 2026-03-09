@@ -142,20 +142,33 @@ def require_role(*roles: str):
     Dependency factory that restricts an endpoint to users whose role is one
     of the provided *roles*.
 
+    Role hierarchy: super_admin > admin > professor > researcher | student
+    super_admin passes ALL role checks automatically.
+    admin passes all checks except super_admin-only endpoints.
+
     Usage::
 
         @router.get("/admin-only")
         def admin_view(user = Depends(require_role("admin"))):
             ...
     """
+    # Roles that implicitly satisfy a lower-privilege requirement
+    _SUPER_ROLES = {
+        "super_admin": {"super_admin", "admin", "professor", "researcher", "student"},
+        "admin": {"admin", "professor", "researcher", "student"},
+    }
 
     def _check_role(current_user: Any = Depends(get_current_user)) -> Any:
-        if current_user.role not in roles:
+        user_role = current_user.role
+        # Build effective role set (includes implicit elevations)
+        effective_roles = _SUPER_ROLES.get(user_role, {user_role})
+        # Allow if any required role is in the user's effective set
+        if not effective_roles.intersection(set(roles)):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=(
                     f"Access denied. Required role(s): {', '.join(roles)}. "
-                    f"Your role: {current_user.role}"
+                    f"Your role: {user_role}"
                 ),
             )
         return current_user

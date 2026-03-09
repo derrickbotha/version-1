@@ -12,6 +12,16 @@ import {
   LogOut,
   User,
   ChevronRight,
+  BookOpen,
+  Award,
+  Star,
+  ClipboardList,
+  Shield,
+  Users,
+  TrendingUp,
+  Settings,
+  AlertCircle,
+  CreditCard,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -44,10 +54,47 @@ const researcherLinks = [
   { label: 'Wallet', href: '/wallet', icon: Wallet },
 ]
 
+const professorLinks = [
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { label: 'Review Queue', href: '/professor/queue', icon: ClipboardList },
+  { label: 'Quality Reviews', href: '/professor/reviews', icon: Star },
+  { label: 'Assignments', href: '/professor/assignments', icon: BookOpen },
+  { label: 'Credentials', href: '/professor/credentials', icon: Award },
+  { label: 'Disputes', href: '/professor/disputes', icon: AlertCircle },
+  { label: 'Analytics', href: '/professor/analytics', icon: TrendingUp },
+]
+
+const adminLinks = [
+  { label: 'Dashboard', href: '/admin/dashboard', icon: LayoutDashboard },
+  { label: 'Users', href: '/admin/users', icon: Users },
+  { label: 'Professors', href: '/admin/professors', icon: Award },
+  { label: 'Jobs', href: '/admin/jobs', icon: FileText },
+  { label: 'Contracts', href: '/admin/contracts', icon: ScrollText },
+  { label: 'Disputes', href: '/admin/disputes', icon: AlertCircle },
+  { label: 'Payouts', href: '/admin/payouts', icon: CreditCard },
+  { label: 'Transactions', href: '/admin/transactions', icon: TrendingUp },
+  { label: 'Config', href: '/admin/config', icon: Settings },
+  { label: 'Audit Log', href: '/admin/audit-log', icon: Shield },
+]
+
+function getLinks(role: string) {
+  if (role === 'admin' || role === 'super_admin') return adminLinks
+  if (role === 'professor') return professorLinks
+  if (role === 'researcher') return researcherLinks
+  return studentLinks
+}
+
+function getSectionLabel(role: string) {
+  if (role === 'admin' || role === 'super_admin') return 'Admin Panel'
+  if (role === 'professor') return 'Professor Portal'
+  if (role === 'researcher') return 'Researcher Menu'
+  return 'Student Menu'
+}
+
 export default function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const links = user.role === 'researcher' ? researcherLinks : studentLinks
+  const links = getLinks(user.role)
 
   function handleSignOut() {
     localStorage.removeItem('auth_token')
@@ -70,7 +117,7 @@ export default function Sidebar({ user }: SidebarProps) {
       {/* Nav links */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto">
         <p className="px-3 mb-2 text-[10px] font-semibold text-medGrey uppercase tracking-widest">
-          {user.role === 'researcher' ? 'Researcher' : 'Student'} Menu
+          {getSectionLabel(user.role)}
         </p>
         <ul className="space-y-0.5">
           {links.map(({ label, href, icon: Icon }) => {

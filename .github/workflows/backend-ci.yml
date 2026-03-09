@@ -100,5 +100,12 @@ jobs:
           print('✅ All new services import cleanly')
           from app.routers.account_router import router as account_router
           from app.routers.webhook_router import router as webhook_router
+          from app.routers.professor_router import router as professor_router
+          from app.routers.admin_router_v2 import router as admin_router_v2
           print('✅ All new routers import cleanly')
+          from app.models.professor import ProfessorProfile, Institution, QualityReview, ReviewQueueItem, PlatformConfig
+          print('✅ All professor models import cleanly')
+          from app.services.professor_service import create_professor_profile, submit_quality_review
+          from app.services.admin_service_v2 import get_platform_overview, action_professor
+          print('✅ All new services import cleanly')
           "

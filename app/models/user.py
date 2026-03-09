@@ -24,7 +24,9 @@ from app.database.base import Base, TimestampMixin
 class UserRole(str):
     STUDENT = "student"
     RESEARCHER = "researcher"
+    PROFESSOR = "professor"
     ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
 
 
 class UserStatus(str):
@@ -56,7 +58,7 @@ class User(TimestampMixin, Base):
     first_name: Mapped[str] = mapped_column(String(100), nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[str] = mapped_column(
-        Enum("student", "researcher", "admin", name="user_role_enum"),
+        Enum("student", "researcher", "professor", "admin", "super_admin", name="user_role_enum"),
         nullable=False,
         default="student",
     )

@@ -93,6 +93,16 @@ jobs:
             '/api/v1/payments/payouts',
             '/api/v1/webhooks/stripe',
             '/api/v1/webhooks/paypal',
+            '/api/v1/professor/profile',
+            '/api/v1/professor/queue',
+            '/api/v1/professor/analytics',
+            '/api/v1/professor/assignments',
+            '/api/v1/professor/credentials',
+            '/api/v1/professor/endorsements',
+            '/api/v1/admin/dashboard',
+            '/api/v1/admin/professors',
+            '/api/v1/admin/config',
+            '/api/v1/admin/audit-log',
           ]
           missing = [r for r in required if r not in paths]
           if missing:

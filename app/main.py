@@ -89,6 +89,7 @@ async def lifespan(app: FastAPI):  # type: ignore[type-arg]
         import app.models.job  # noqa: F401, PLC0415
         import app.models.message  # noqa: F401, PLC0415
         import app.models.payment  # noqa: F401, PLC0415  — includes LedgerAccount, LedgerEntry, PaymentMethod, WriterPayout, IdempotencyKey
+        import app.models.professor  # noqa: F401, PLC0415  — Institution, ProfessorProfile, ResearcherCredential, ProfessorEndorsement, CourseAssignment, QualityReview, DisputeRuling, ReviewQueueItem, PlatformConfig
         import app.models.submission  # noqa: F401, PLC0415
         import app.models.user  # noqa: F401, PLC0415
 
@@ -197,6 +198,7 @@ def create_app() -> FastAPI:
 
     from app.routers.account_router import router as account_router  # noqa: PLC0415
     from app.routers.admin_router import router as admin_router  # noqa: PLC0415
+    from app.routers.admin_router_v2 import router as admin_router_v2  # noqa: PLC0415
     from app.routers.auth_router import router as auth_router  # noqa: PLC0415
     from app.routers.bids_router import router as bids_router  # noqa: PLC0415
     from app.routers.contracts_router import router as contracts_router  # noqa: PLC0415
@@ -204,6 +206,7 @@ def create_app() -> FastAPI:
     from app.routers.jobs_router import router as jobs_router  # noqa: PLC0415
     from app.routers.messages_router import router as messages_router  # noqa: PLC0415
     from app.routers.payments_router import router as payments_router  # noqa: PLC0415
+    from app.routers.professor_router import router as professor_router  # noqa: PLC0415
     from app.routers.ratings_router import router as ratings_router  # noqa: PLC0415
     from app.routers.submissions_router import router as submissions_router  # noqa: PLC0415
     from app.routers.webhook_router import router as webhook_router  # noqa: PLC0415
@@ -220,7 +223,9 @@ def create_app() -> FastAPI:
     app.include_router(submissions_router, prefix=api_prefix)
     app.include_router(ratings_router, prefix=api_prefix)
     app.include_router(disputes_router, prefix=api_prefix)
-    app.include_router(admin_router, prefix=api_prefix)
+    app.include_router(admin_router, prefix=api_prefix)   # original (kept for backwards compat)
+    app.include_router(admin_router_v2, prefix=api_prefix)  # enhanced admin endpoints
+    app.include_router(professor_router, prefix=api_prefix)
     app.include_router(webhook_router, prefix=api_prefix)
     app.include_router(whatsapp_router, prefix=api_prefix)
 
