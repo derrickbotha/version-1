@@ -1,0 +1,284 @@
+{
+  "name": "ASA v2 - Assignment Ingest Pipeline",
+  "nodes": [
+    {
+      "id": "webhook-trigger",
+      "name": "Assignment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "parameters": {
+        "path": "assignment-ingest",
+        "method": "POST",
+        "responseMode": "onReceived"
+      }
+    },
+    {
+      "id": "parse-assignment",
+      "name": "Parse Assignment",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "values": {
+          "string": [
+            {"name": "assignment_id",  "value": "={{ $json.assignment_id }}"},
+            {"name": "title",          "value": "={{ $json.title }}"},
+            {"name": "topic",          "value": "={{ $json.topic }}"},
+            {"name": "instructions",   "value": "={{ $json.instructions }}"},
+            {"name": "focus_area",     "value": "={{ $json.focus_area }}"},
+            {"name": "word_count",     "value": "={{ $json.word_count }}"},
+            {"name": "academic_level", "value": "={{ $json.academic_level }}"},
+            {"name": "delivery_method","value": "={{ $json.delivery_method }}"},
+            {"name": "review_type",    "value": "={{ $json.review_type }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "status-researching",
+      "name": "Update Status: Researching",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "parameters": {
+        "url": "http://api:8000/api/v1/webhook/n8n/status",
+        "method": "POST",
+        "sendHeaders": true,
+        "headers": {"X-N8N-Secret": "n8n-internal-secret-changeme"},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id", "value": "={{ $json.assignment_id }}"},
+            {"name": "stage",         "value": "research_start"},
+            {"name": "status",        "value": "researching"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "research-agent",
+      "name": "Research Agent (Perplexity)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [900, 300],
+      "parameters": {
+        "url": "http://api:8000/api/v1/internal/research",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "topic",          "value": "={{ $json.topic }}"},
+            {"name": "focus_area",     "value": "={{ $json.focus_area }}"},
+            {"name": "academic_level", "value": "={{ $json.academic_level }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "status-writing",
+      "name": "Update Status: Writing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1120, 300],
+      "parameters": {
+        "url": "http://api:8000/api/v1/webhook/n8n/status",
+        "method": "POST",
+        "sendHeaders": true,
+        "headers": {"X-N8N-Secret": "n8n-internal-secret-changeme"},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id", "value": "={{ $('Parse Assignment').item.json.assignment_id }}"},
+            {"name": "stage",         "value": "writing_start"},
+            {"name": "status",        "value": "writing"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "writing-agent",
+      "name": "Writing Agent (DeepSeek)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1340, 300],
+      "parameters": {
+        "url": "http://api:8000/api/v1/internal/write",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id", "value": "={{ $('Parse Assignment').item.json.assignment_id }}"},
+            {"name": "title",         "value": "={{ $('Parse Assignment').item.json.title }}"},
+            {"name": "sources",       "value": "={{ JSON.stringify($json.sources) }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "status-qa",
+      "name": "Update Status: QA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1560, 300],
+      "parameters": {
+        "url": "http://api:8000/api/v1/webhook/n8n/status",
+        "method": "POST",
+        "sendHeaders": true,
+        "headers": {"X-N8N-Secret": "n8n-internal-secret-changeme"},
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id", "value": "={{ $('Parse Assignment').item.json.assignment_id }}"},
+            {"name": "stage",         "value": "qa_start"},
+            {"name": "status",        "value": "qa_check"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "qa-agent",
+      "name": "QA Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [1780, 300],
+      "parameters": {
+        "url": "http://api:8000/api/v1/internal/qa",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id", "value": "={{ $('Parse Assignment').item.json.assignment_id }}"},
+            {"name": "essay_markdown","value": "={{ $json.essay_markdown }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "prof-review-check",
+      "name": "Professor Review Required?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2000, 300],
+      "parameters": {
+        "conditions": {
+          "string": [{
+            "value1": "={{ $('Parse Assignment').item.json.review_type }}",
+            "operation": "equals",
+            "value2": "agent_professor"
+          }]
+        }
+      }
+    },
+    {
+      "id": "notify-professor",
+      "name": "Notify Professor Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [2220, 160],
+      "parameters": {
+        "url": "http://api:8000/api/v1/webhook/n8n/status",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id", "value": "={{ $('Parse Assignment').item.json.assignment_id }}"},
+            {"name": "status",        "value": "prof_review"},
+            {"name": "stage",         "value": "awaiting_professor"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "delivery-agent",
+      "name": "Delivery Agent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [2220, 440],
+      "parameters": {
+        "url": "http://api:8000/api/v1/internal/deliver",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id",  "value": "={{ $('Parse Assignment').item.json.assignment_id }}"},
+            {"name": "delivery_method","value": "={{ $('Parse Assignment').item.json.delivery_method }}"},
+            {"name": "essay_markdown", "value": "={{ $json.essay_markdown }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "status-completed",
+      "name": "Update Status: Completed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [2440, 440],
+      "parameters": {
+        "url": "http://api:8000/api/v1/webhook/n8n/status",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "assignment_id", "value": "={{ $('Parse Assignment').item.json.assignment_id }}"},
+            {"name": "status",        "value": "completed"},
+            {"name": "stage",         "value": "delivered"},
+            {"name": "result",        "value": "={{ JSON.stringify($json) }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [240, 560],
+      "parameters": {}
+    },
+    {
+      "id": "notify-error",
+      "name": "Notify Error",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "position": [460, 560],
+      "parameters": {
+        "url": "http://api:8000/api/v1/webhook/n8n/status",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "stage",  "value": "error"},
+            {"name": "status", "value": "failed"},
+            {"name": "result", "value": "={{ JSON.stringify($json) }}"}
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Assignment Webhook":         {"main": [[{"node": "Parse Assignment",          "type": "main", "index": 0}]]},
+    "Parse Assignment":           {"main": [[{"node": "Update Status: Researching", "type": "main", "index": 0}]]},
+    "Update Status: Researching": {"main": [[{"node": "Research Agent (Perplexity)","type": "main", "index": 0}]]},
+    "Research Agent (Perplexity)":{"main": [[{"node": "Update Status: Writing",    "type": "main", "index": 0}]]},
+    "Update Status: Writing":     {"main": [[{"node": "Writing Agent (DeepSeek)",  "type": "main", "index": 0}]]},
+    "Writing Agent (DeepSeek)":   {"main": [[{"node": "Update Status: QA",         "type": "main", "index": 0}]]},
+    "Update Status: QA":          {"main": [[{"node": "QA Agent",                  "type": "main", "index": 0}]]},
+    "QA Agent":                   {"main": [[{"node": "Professor Review Required?", "type": "main", "index": 0}]]},
+    "Professor Review Required?": {
+      "main": [
+        [{"node": "Notify Professor Queue", "type": "main", "index": 0}],
+        [{"node": "Delivery Agent",         "type": "main", "index": 0}]
+      ]
+    },
+    "Delivery Agent":             {"main": [[{"node": "Update Status: Completed",  "type": "main", "index": 0}]]},
+    "Error Handler":              {"main": [[{"node": "Notify Error",              "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": ""
+  },
+  "tags": ["asa", "academic", "automation"]
+}
