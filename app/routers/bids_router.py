@@ -29,10 +29,10 @@ router = APIRouter(tags=["Bids"])
 def place_bid(
     job_id: uuid.UUID,
     body: BidCreate,
-    current_user: User = Depends(require_role("researcher")),
+    current_user: User = Depends(require_role("researcher", "professor")),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Place a bid on a job. Restricted to researchers."""
+    """Place a bid on a job. Restricted to researchers and professors."""
     bid = bid_service.place_bid(
         db=db,
         job_id=job_id,
@@ -155,10 +155,10 @@ def counter_bid(
 )
 def withdraw_bid(
     bid_id: uuid.UUID,
-    current_user: User = Depends(require_role("researcher")),
+    current_user: User = Depends(require_role("researcher", "professor")),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Withdraw a bid. Restricted to the researcher who placed the bid."""
+    """Withdraw a bid. Restricted to the researcher/professor who placed the bid."""
     bid = bid_service.withdraw_bid(
         db=db,
         bid_id=bid_id,
@@ -176,10 +176,10 @@ def withdraw_bid(
     summary="Get own bids (researcher)",
 )
 def get_my_bids(
-    current_user: User = Depends(require_role("researcher")),
+    current_user: User = Depends(require_role("researcher", "professor")),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Return all bids placed by the authenticated researcher."""
+    """Return all bids placed by the authenticated researcher or professor."""
     bids = bid_service.get_researcher_bids(db=db, researcher_id=current_user.id)
     response = BidListResponse(
         items=[BidResponse.model_validate(b) for b in bids],

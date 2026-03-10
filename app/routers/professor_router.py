@@ -33,7 +33,9 @@ from app.schemas.professor_schema import (
     QualityReviewSubmit,
     ReviewQueueItemResponse,
 )
-from app.services import professor_service
+from app.services import professor_service, job_service, bid_service
+from app.schemas.job_schema import JobFilterParams, JobListResponse, JobResponse
+from app.schemas.bid_schema import BidCreate, BidResponse, BidListResponse
 from app.utils.jwt_handler import get_current_user, require_role
 
 router = APIRouter(prefix="/professor", tags=["Professor"])
@@ -333,3 +335,79 @@ def get_analytics(
 ):
     """Professor performance analytics dashboard."""
     return professor_service.get_professor_analytics(db, current_user.id)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Job Marketplace (professors browse & bid)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/jobs", response_model=dict)
+def list_professor_jobs(
+    status: str = Query("open", description="Filter by job status"),
+    subject: str | None = Query(None, description="Filter by subject"),
+    min_price: float | None = Query(None, description="Minimum price"),
+    max_price: float | None = Query(None, description="Maximum price"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_role("professor")),
+):
+    """Browse the job marketplace. Returns open jobs professors can bid on."""
+    from decimal import Decimal
+    filters = JobFilterParams(
+        status=status,
+        subject=subject,
+        min_price=Decimal(str(min_price)) if min_price is not None else None,
+        max_price=Decimal(str(max_price)) if max_price is not None else None,
+        page=page,
+        page_size=page_size,
+    )
+    items, total = job_service.get_jobs(db=db, filters=filters)
+    return {
+        "status": "success",
+        "data": JobListResponse(
+            items=[JobResponse.model_validate(j) for j in items],
+            total=total,
+            page=page,
+            page_size=page_size,
+        ).model_dump(),
+    }
+
+
+@router.get("/jobs/{job_id}", response_model=dict)
+def get_professor_job(
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    _current_user: User = Depends(require_role("professor")),
+):
+    """Get details of a specific job."""
+    job = job_service.get_job_by_id(db=db, job_id=job_id)
+    return {"status": "success", "data": JobResponse.model_validate(job).model_dump()}
+
+
+@router.post("/jobs/{job_id}/bid", response_model=dict, status_code=201)
+def professor_bid_on_job(
+    job_id: uuid.UUID,
+    body: BidCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("professor")),
+):
+    """Place a bid on a job as a professor."""
+    bid = bid_service.place_bid(db=db, job_id=job_id, researcher_id=current_user.id, data=body)
+    return {"status": "success", "data": BidResponse.model_validate(bid).model_dump()}
+
+
+@router.get("/my-bids", response_model=dict)
+def get_professor_bids(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("professor")),
+):
+    """Return all bids placed by the authenticated professor."""
+    bids = bid_service.get_researcher_bids(db=db, researcher_id=current_user.id)
+    return {
+        "status": "success",
+        "data": BidListResponse(
+            items=[BidResponse.model_validate(b) for b in bids],
+            total=len(bids),
+        ).model_dump(),
+    }
